@@ -1,0 +1,63 @@
+# Importing basic modules
+import pandas as pd
+import numpy as np
+import sys, os, re, json, math
+import datetime
+from datetime import timedelta, datetime, tzinfo
+import csv
+import time
+import glob
+from osgeo import gdal, osr 
+from rasterstats import zonal_stats
+print ("Module import successful")
+Ser_dir = "D:\Gravity_Wave_dissipation"
+os.chdir(Ser_dir)
+files = filter(os.path.isfile, glob.glob('*.nc'))
+files=sorted(files)
+count=1
+csv_filename = 'E:\\Gravity wave dissipation\\GravityTs.csv'
+f1 = open(csv_filename,'w',newline="")
+writer1 = csv.writer(f1)
+for filename in files:
+    grib = gdal.Open(filename)
+    src_ds =grib
+    number_of_bands = grib.RasterCount
+    print(number_of_bands)
+    print ("grib.RasterYSize", grib.RasterYSize)
+    print ("grib.RasterXSize", grib.RasterXSize)    
+    for k in range(1,int(number_of_bands)+1):  
+        band = grib.GetRasterBand(k)   
+        metadata = band.GetMetadata()
+        band_date_value = int(metadata['NETCDF_DIM_time'])
+        nodata_Value = band.GetNoDataValue() #missing_value
+        nodata_Value = float(nodata_Value)
+        nodata_Value
+        initial_date = datetime(1900,1,1)
+        nc_band_date= initial_date+timedelta(hours=band_date_value)
+        str_date= nc_band_date.strftime('%Y-%m-%d %H:%M:%S')
+        date_file_name= 'gravity_'+nc_band_date.strftime('%Y%m%d%H%M%S')
+        d0=str_date
+        src_ds=grib
+        tif_file_dir = 'E:\\Gravity wave dissipation\\tif\\'
+        dst_filename= tif_file_dir+date_file_name+'.tif'
+        out_form= "GTiff" 
+        # Output to new format using gdal.Translate. See https://gdal.org/python/ for osgeo.gdal.Translate options.
+        dst_ds = gdal.Translate(dst_filename, src_ds, format=out_form, bandList=[k])
+
+        # Properly close the datasets to flush to disk
+        dst_ds = None
+        jtats=zonal_stats("E:\\Gravity wave dissipation\\shapefile\\him1.shp", dst_filename,all_touched=True,nodata=nodata_Value)
+        writer1.writerow([d0,jtats[0]['min'],jtats[0]['mean'],jtats[0]['max']])
+        print (k,band_name,str_date,dst_filename)
+    src_ds = None
+f1.close()
+
+df = pd.read_csv(csv_filename,index_col=0,parse_dates=True,header=None)
+df.head(2)
+df = df.sort_index()
+df.to_csv(csv_filename,header=False)
+ 
+import xarray as xr
+nc_file = xr.open_dataset(f)
+nc_file
+
